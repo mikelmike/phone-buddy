@@ -1,0 +1,12 @@
+*.jks
+*.keystore
+keystore/
+keystore.properties
+local.properties
+.gradle/
+build/
+**/build/
+**/.cxx/
+*.so
+*.apk
+*.gguf*

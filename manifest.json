@@ -1,0 +1,10 @@
+{
+  "name": "Phone Buddy",
+  "short_name": "Phone Buddy",
+  "description": "Clean 3-character phone buddy",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0d0d0d",
+  "theme_color": "#0d0d0d",
+  "orientation": "portrait"
+}

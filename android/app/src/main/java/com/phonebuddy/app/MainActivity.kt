@@ -38,9 +38,17 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         private const val RELEASE_BASE_URL =
-            "https://github.com/mikelmike/phone-buddy/releases/download/v0.6.0/"
-        private const val MODEL_FILENAME = "buddy-1.2b-instruct-v0.6.0-q8_0.gguf"
-        private const val MIN_VALID_MODEL_BYTES = 800_000_000L
+            "https://github.com/mikelmike/phone-buddy/releases/download/v0.5.1/"
+        private const val MODEL_FILENAME = "buddy-4b-social-v0.5.1-q4_k_m.gguf"
+        private const val MIN_VALID_MODEL_BYTES = 500_000_000L
+
+        private val PREFERRED_MODELS = listOf(
+            "qwen3-4b-instruct-2507-q4_k_m.gguf",
+            "qwen3-4b-q4_k_m.gguf",
+            "qwen3-4b-instruct-q4_k_m.gguf",
+            "buddy-4b-social-v0.5.1-q4_k_m.gguf",
+            "buddy-1.2b-instruct-v0.6.0-q8_0.gguf"
+        )
 
         private val SPORTS_OR_MEMORY_RE = Regex(
             "\\b(score|scores|game|games|play|playing|tonight|nba|nfl|nhl|mlb|knicks|senators|penguins|eagles|standings|who won|winning|losing|team|teams|sports|distraction|my name|who am i|remember|anything you want to tell me|anything new|what's new|whats new|what happened)\\b",
@@ -65,10 +73,11 @@ class MainActivity : ComponentActivity() {
 
     @Volatile private var modelReady = false
     @Volatile private var modelLoading = false
+    @Volatile private var currentLoadedModel: File? = null
     private val downloading = AtomicBoolean(false)
     @Volatile private var progressPct = 0
     @Volatile private var downloadedMb = 0
-    @Volatile private var totalMb = 1189
+    @Volatile private var totalMb = 2381
     @Volatile private var lastError = ""
 
     private var speechRecognizer: SpeechRecognizer? = null
@@ -133,55 +142,50 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun modelFile(): File {
-        // 1. Check shared Downloads/PhoneBuddy or Downloads
+        val searchDirs = mutableListOf<File>()
         try {
-            val dlDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "PhoneBuddy")
-            if (dlDir.exists()) {
-                val f = File(dlDir, MODEL_FILENAME)
+            val pubDl = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            searchDirs.add(File(pubDl, "PhoneBuddy"))
+            searchDirs.add(pubDl)
+        } catch (_: Exception) {}
+        searchDirs.add(File("/sdcard/Android/data/com.phonebuddy.app/files/models"))
+        searchDirs.add(File("/sdcard/Android/data/com.phonebuddy.light/files/models"))
+        getExternalFilesDir("models")?.let { searchDirs.add(it) }
+        searchDirs.add(File(filesDir, "models"))
+
+        // 1. Check for exact preferred filenames
+        for (dir in searchDirs) {
+            if (!dir.exists() || !dir.isDirectory) continue
+            for (pref in PREFERRED_MODELS) {
+                val f = File(dir, pref)
                 if (f.exists() && f.length() > MIN_VALID_MODEL_BYTES) return f
-            }
-            val plainDl = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), MODEL_FILENAME)
-            if (plainDl.exists() && plainDl.length() > MIN_VALID_MODEL_BYTES) return plainDl
-        } catch (_: Exception) {}
-
-        // 2. Check sibling app's external files dir (if light installed next to full app)
-        try {
-            val fullAppDir = File("/sdcard/Android/data/com.phonebuddy.app/files/models", MODEL_FILENAME)
-            if (fullAppDir.exists() && fullAppDir.length() > MIN_VALID_MODEL_BYTES) return fullAppDir
-        } catch (_: Exception) {}
-
-        // 3. Current app external files dir
-        val extDir = getExternalFilesDir("models")
-        if (extDir != null) {
-            if (!extDir.exists()) extDir.mkdirs()
-            val extFile = File(extDir, MODEL_FILENAME)
-            if (extFile.exists() && extFile.length() > MIN_VALID_MODEL_BYTES) {
-                return extFile
             }
         }
 
-        // 4. Internal files dir
-        val dir = File(filesDir, "models")
-        if (!dir.exists()) dir.mkdirs()
-        val intFile = File(dir, MODEL_FILENAME)
-        if (intFile.exists() && intFile.length() > MIN_VALID_MODEL_BYTES) return intFile
-        return if (extDir != null) File(extDir, MODEL_FILENAME) else intFile
+        // 2. Check for any 4B or Qwen GGUF
+        for (dir in searchDirs) {
+            if (!dir.exists() || !dir.isDirectory) continue
+            val found4b = dir.listFiles { _, name ->
+                name.endsWith(".gguf", ignoreCase = true) &&
+                (name.contains("4b", ignoreCase = true) || name.contains("qwen", ignoreCase = true))
+            }?.firstOrNull { it.length() > MIN_VALID_MODEL_BYTES }
+            if (found4b != null) return found4b
+        }
+
+        // 3. Fallback: Any valid GGUF file
+        for (dir in searchDirs) {
+            if (!dir.exists() || !dir.isDirectory) continue
+            val anyGguf = dir.listFiles { _, name ->
+                name.endsWith(".gguf", ignoreCase = true)
+            }?.firstOrNull { it.length() > MIN_VALID_MODEL_BYTES }
+            if (anyGguf != null) return anyGguf
+        }
+
+        val extDir = getExternalFilesDir("models")
+        return if (extDir != null) File(extDir, MODEL_FILENAME) else File(File(filesDir, "models"), MODEL_FILENAME)
     }
 
     private fun checkOrLoadExistingModel() {
-        // Automatically reclaim 2.4 GB if an older 4B GGUF was left in app storage
-        workerPool.execute {
-            try {
-                listOfNotNull(getExternalFilesDir("models"), File(filesDir, "models")).forEach { d ->
-                    d.listFiles()?.forEach { f ->
-                        if (f.name != MODEL_FILENAME && (f.name.startsWith("buddy-4b-") || f.name.endsWith(".part_dl") && !f.name.startsWith(MODEL_FILENAME))) {
-                            f.delete()
-                        }
-                    }
-                }
-            } catch (_: Exception) {
-            }
-        }
         val mf = modelFile()
         if (mf.exists() && mf.length() > MIN_VALID_MODEL_BYTES && !modelReady && !modelLoading) {
             loadModelAsync(mf)
@@ -193,6 +197,7 @@ class MainActivity : ComponentActivity() {
     private fun loadModelAsync(mf: File) {
         modelLoading = true
         lastError = ""
+        currentLoadedModel = mf
         pushModelStatusToJs()
         workerPool.execute {
             val cores = Runtime.getRuntime().availableProcessors()
@@ -218,7 +223,13 @@ class MainActivity : ComponentActivity() {
                         .put("brevity", "normal")
                     buildSocialSystemPrompt("buddy_default_v1", defaultLevers, "", "Mike", "Senators, Penguins, Knicks, Eagles")
                 }
-                LlamaBridge.nativeWarmupPrefix("<|startoftext|><|im_start|>system\n$baseSys")
+                val isQwen = mf.name.contains("qwen", ignoreCase = true) || mf.name.contains("4b", ignoreCase = true)
+                val warmupPrefix = if (isQwen) {
+                    "<|im_start|>system\n$baseSys"
+                } else {
+                    "<|startoftext|><|im_start|>system\n$baseSys"
+                }
+                LlamaBridge.nativeWarmupPrefix(warmupPrefix)
             }
         }
     }
@@ -452,9 +463,18 @@ class MainActivity : ComponentActivity() {
         return lines.joinToString("\n")
     }
 
+    private fun isCurrentModelQwen(): Boolean {
+        val name = currentLoadedModel?.name ?: MODEL_FILENAME
+        return name.contains("qwen", ignoreCase = true) || name.contains("4b", ignoreCase = true)
+    }
+
     private fun buildChatMlPrompt(sysPrompt: String, historyArr: JSONArray, hasPhysicalCue: Boolean = false): String {
         val sb = StringBuilder()
-        sb.append("<|startoftext|><|im_start|>system\n").append(sysPrompt).append("<|im_end|>\n")
+        if (isCurrentModelQwen()) {
+            sb.append("<|im_start|>system\n").append(sysPrompt).append("<|im_end|>\n")
+        } else {
+            sb.append("<|startoftext|><|im_start|>system\n").append(sysPrompt).append("<|im_end|>\n")
+        }
         val startIdx = (historyArr.length() - 18).coerceAtLeast(0)
         val lastIdx = historyArr.length() - 1
         for (i in startIdx until historyArr.length()) {
@@ -479,6 +499,7 @@ class MainActivity : ComponentActivity() {
         put("downloadedMb", downloadedMb)
         put("totalMb", totalMb)
         put("error", lastError)
+        put("modelName", currentLoadedModel?.name ?: MODEL_FILENAME)
     }
 
     private fun pushModelStatusToJs() {
@@ -588,7 +609,12 @@ class MainActivity : ComponentActivity() {
                     } else {
                         buildSocialSystemPrompt(personaId, levers, "", userName, userTeams)
                     }
-                    LlamaBridge.nativeWarmupPrefix("<|startoftext|><|im_start|>system\n$baseSys")
+                    val warmupPrefix = if (isCurrentModelQwen()) {
+                        "<|im_start|>system\n$baseSys"
+                    } else {
+                        "<|startoftext|><|im_start|>system\n$baseSys"
+                    }
+                    LlamaBridge.nativeWarmupPrefix(warmupPrefix)
                 } catch (_: Exception) {
                 }
             }

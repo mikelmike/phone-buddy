@@ -19,8 +19,8 @@ android {
         applicationId = "com.phonebuddy.app"
         minSdk = 28
         targetSdk = 36
-        versionCode = 80
-        versionName = "0.8.0"
+        versionCode = 90
+        versionName = "0.9.0-4b"
 
         ndk {
             abiFilters += listOf("arm64-v8a")
@@ -43,15 +43,15 @@ android {
         create("full") {
             dimension = "version"
             applicationId = "com.phonebuddy.app"
-            versionCode = 80
-            versionName = "0.8.0"
+            versionCode = 90
+            versionName = "0.9.0-4b"
             manifestPlaceholders["appLabel"] = "Phone Buddy"
         }
         create("light") {
             dimension = "version"
             applicationId = "com.phonebuddy.light"
-            versionCode = 80
-            versionName = "0.8.0-light"
+            versionCode = 90
+            versionName = "0.9.0-4b-light"
             manifestPlaceholders["appLabel"] = "Phone Buddy Light"
         }
     }

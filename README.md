@@ -1,6 +1,6 @@
 # Phone Buddy
 
-Fast, 100% offline on-device AI companion and personal assistant for Android (Samsung Galaxy S24 / ARM64), powered by native `llama.cpp` and `LFM2.5-1.2B-Instruct`.
+Fast, 100% offline on-device AI companion and personal assistant for Android (Samsung Galaxy S24 / ARM64), powered by native `llama.cpp` and stock **Qwen3-4B-Instruct-2507** (with backward compatibility for 1.2B/2.6B models).
 
 ---
 
@@ -14,8 +14,8 @@ Phone Buddy comes in two standalone product flavors that install side-by-side on
 | **Target Use** | Smart Personal Assistant & Productive Tasks | Casual Companion & Dynamic Banter |
 | **Capabilities** | Step-by-step intermediate math, drafted emails, notes context | Jay, Mack, Nora characters with equalizer levers |
 | **Language** | Automatic Bilingual (English / Russian) | English / Russian |
-| **Brain** | 1.2B Q8_0 GGUF via ARM64 `llama.cpp` | 1.2B Q8_0 GGUF via ARM64 `llama.cpp` |
-| **Package** | `com.phonebuddy.light` (v0.8.0-light) | `com.phonebuddy.app` (v0.8.0 / v0.6.0) |
+| **Brain** | Stock **Qwen3-4B-Instruct-2507** (or 1.2B Q8_0) | Stock **Qwen3-4B-Instruct-2507** (or 1.2B Q8_0) |
+| **Package** | `com.phonebuddy.light` (v0.9.0-4b) | `com.phonebuddy.app` (v0.9.0-4b) |
 | **APK Size** | **7.33 MB** | **7.33 MB** |
 
 ---
@@ -24,9 +24,9 @@ Phone Buddy comes in two standalone product flavors that install side-by-side on
 
 Download and install directly to your Samsung Galaxy S24 or any ARM64 Android device:
 
-* **[Download Phone Buddy Light APK (`v0.8.0-light`)](https://github.com/mikelmike/phone-buddy/releases/download/v0.8.0-light/phone-buddy-light.apk)** — *Recommended for everyday assistant use*
-* **[Download Phone Buddy Full APK (`v0.8.0-light`)](https://github.com/mikelmike/phone-buddy/releases/download/v0.8.0-light/phone-buddy-full.apk)** — *Multi-character companion edition*
-* **[GitHub Releases Page](https://github.com/mikelmike/phone-buddy/releases/tag/v0.8.0-light)**
+* **[Download Phone Buddy Light APK (`v0.9.0-4b`)](https://github.com/mikelmike/phone-buddy/releases/download/v0.9.0-4b/phone-buddy-light.apk)** — *Recommended for everyday assistant use*
+* **[Download Phone Buddy Full APK (`v0.9.0-4b`)](https://github.com/mikelmike/phone-buddy/releases/download/v0.9.0-4b/phone-buddy-full.apk)** — *Multi-character companion edition*
+* **[GitHub Releases Page](https://github.com/mikelmike/phone-buddy/releases/tag/v0.9.0-4b)**
 
 ---
 

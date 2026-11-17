@@ -662,8 +662,12 @@
       } catch {}
       if (verEl) verEl.textContent = `${APP_VERSION} • Offline Android (llama.cpp 1.2B)`;
     } else {
-      document.getElementById('downloadApkLink').classList.remove('hidden');
-      document.getElementById('apkInstallGroup').style.display = 'block';
+      const apkBtn = document.getElementById('downloadApkLink');
+      if (apkBtn) apkBtn.classList.remove('hidden');
+      const lightBtn = document.getElementById('openLightWebLink');
+      if (lightBtn) lightBtn.classList.remove('hidden');
+      const apkGrp = document.getElementById('apkInstallGroup');
+      if (apkGrp) apkGrp.style.display = 'block';
       if (verEl) verEl.textContent = `${APP_VERSION} • GitHub Pages`;
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js').catch(() => {});

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0d0d0d" />
+  <link rel="manifest" href="manifest.json" />
+  <title>Phone Buddy Light</title>
+  <link rel="stylesheet" href="styles.css?v=0.8.0" />
+</head>
+<body>
+  <div class="phone-frame">
+    <!-- Minimal Top Header: New Chat | Title & Status | Save + Settings -->
+    <header class="top-bar">
+      <button class="ghost-icon-btn" id="clearChatBtn" title="New conversation" aria-label="New conversation">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </button>
+
+      <div class="header-center">
+        <span class="app-title">Phone Buddy Light</span>
+        <span class="status-badge" id="engineStatusBadge">On-device</span>
+      </div>
+
+      <div class="header-right">
+        <a
+          class="save-btn"
+          id="downloadLightApkBtn"
+          style="text-decoration:none;display:none"
+          href="https://github.com/mikelmike/phone-buddy/releases/download/v0.8.0-light/phone-buddy-light.apk"
+          title="Download Phone Buddy Light APK"
+        >APK</a>
+        <button class="save-btn" id="saveConvoBtn" title="Save conversation">Save</button>
+        <button class="ghost-icon-btn" id="openSettingsBtn" title="Settings" aria-label="Settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Full-Height ChatGPT-Style Thread -->
+    <main class="chat-thread" id="chatThread"></main>
+
+    <!-- Clean Bottom Composer Pill with Mic & Send/Stop -->
+    <footer class="composer-wrap">
+      <div class="composer-pill">
+        <textarea
+          class="composer-input"
+          id="textInput"
+          rows="1"
+          placeholder="Message Buddy..."
+        ></textarea>
+        <button class="mic-btn" id="micBtn" title="Voice input" aria-label="Voice input">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="23"></line>
+            <line x1="8" y1="23" x2="16" y2="23"></line>
+          </svg>
+          <div class="mic-pulse" id="micPulse"></div>
+        </button>
+        <button class="send-circle-btn" id="sendBtn" title="Send" aria-label="Send" disabled>
+          <svg id="sendIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="19" x2="12" y2="5"></line>
+            <polyline points="5 12 12 5 19 12"></polyline>
+          </svg>
+          <svg id="stopIcon" style="display:none" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+          </svg>
+        </button>
+      </div>
+    </footer>
+
+    <!-- Tucked-Away Settings Sheet -->
+    <div class="overlay hidden" id="settingsOverlay">
+      <div class="sheet-card">
+        <div class="sheet-header">
+          <div>
+            <h2>Assistant Settings</h2>
+            <div class="sheet-ver" id="versionLabel">v0.8.0-light • On-Device AI</div>
+          </div>
+          <button class="ghost-icon-btn" id="closeSettingsBtn" aria-label="Close">✕</button>
+        </div>
+
+        <div class="setting-group">
+          <div class="setting-row" style="padding-top:0">
+            <div>
+              <div class="setting-label">Spoken Voice Replies</div>
+              <div class="setting-sub">Read responses aloud via Android TTS</div>
+            </div>
+            <button class="toggle-btn" id="toggleVoiceAudio">Off</button>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <div class="setting-label">Voice Speech Rate</div>
+          <div class="range-row">
+            <input type="range" id="speechRateSlider" min="0.8" max="1.4" step="0.05" value="1.05" class="slider-control" />
+            <span id="speechRateVal" class="slider-val">1.05x</span>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <div class="setting-label" style="margin-bottom:6px">Assistant Tone</div>
+          <div class="tone-segmented" id="toneSegmented">
+            <button class="tone-btn active" data-tone="concise">Concise &amp; Direct</button>
+            <button class="tone-btn" data-tone="detailed">Thorough &amp; Detailed</button>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <div class="setting-label" style="margin-bottom:4px">Your Name</div>
+          <input class="field-input" id="userNameInput" placeholder="Your Name (e.g. Mike)" />
+        </div>
+
+        <div class="setting-group">
+          <div class="setting-label" style="margin-bottom:4px">Context, Notes &amp; Schedule</div>
+          <div class="setting-sub" style="margin-bottom:6px">Saved in local on-device memory for scheduling and drafts</div>
+          <textarea class="field-textarea" id="userContextInput" rows="3" placeholder="e.g. Schedule: 2:30 PM review (45m), 25m transit, 4:00 PM team call. Bilingual EN/RU."></textarea>
+        </div>
+
+        <div class="setting-group" style="border-bottom:none">
+          <button class="danger-btn" id="resetChatHistoryBtn">Clear Conversation History</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.bundle.js?v=0.8.0"></script>
+</body>
+</html>

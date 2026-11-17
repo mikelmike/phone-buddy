@@ -1,0 +1,10 @@
+{
+  "name": "Phone Buddy Light",
+  "short_name": "Buddy Light",
+  "description": "Smart, personal on-device assistant",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0d0d0d",
+  "theme_color": "#0d0d0d",
+  "orientation": "portrait"
+}

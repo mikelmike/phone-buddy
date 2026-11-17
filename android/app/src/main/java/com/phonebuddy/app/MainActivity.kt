@@ -54,7 +54,11 @@ class MainActivity : ComponentActivity() {
             "\\b(suicide|kill myself|want to die|end it all|self harm|hurt myself)\\b",
             RegexOption.IGNORE_CASE
         )
+        private val RUSSIAN_RE = Regex("[а-яА-ЯёЁ]")
     }
+
+    private val isLightFlavor: Boolean
+        get() = BuildConfig.FLAVOR == "light" || packageName == "com.phonebuddy.light"
 
     private lateinit var webView: WebView
     private val workerPool = Executors.newCachedThreadPool()
@@ -129,6 +133,24 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun modelFile(): File {
+        // 1. Check shared Downloads/PhoneBuddy or Downloads
+        try {
+            val dlDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "PhoneBuddy")
+            if (dlDir.exists()) {
+                val f = File(dlDir, MODEL_FILENAME)
+                if (f.exists() && f.length() > MIN_VALID_MODEL_BYTES) return f
+            }
+            val plainDl = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), MODEL_FILENAME)
+            if (plainDl.exists() && plainDl.length() > MIN_VALID_MODEL_BYTES) return plainDl
+        } catch (_: Exception) {}
+
+        // 2. Check sibling app's external files dir (if light installed next to full app)
+        try {
+            val fullAppDir = File("/sdcard/Android/data/com.phonebuddy.app/files/models", MODEL_FILENAME)
+            if (fullAppDir.exists() && fullAppDir.length() > MIN_VALID_MODEL_BYTES) return fullAppDir
+        } catch (_: Exception) {}
+
+        // 3. Current app external files dir
         val extDir = getExternalFilesDir("models")
         if (extDir != null) {
             if (!extDir.exists()) extDir.mkdirs()
@@ -137,6 +159,8 @@ class MainActivity : ComponentActivity() {
                 return extFile
             }
         }
+
+        // 4. Internal files dir
         val dir = File(filesDir, "models")
         if (!dir.exists()) dir.mkdirs()
         val intFile = File(dir, MODEL_FILENAME)
@@ -145,6 +169,19 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkOrLoadExistingModel() {
+        // Automatically reclaim 2.4 GB if an older 4B GGUF was left in app storage
+        workerPool.execute {
+            try {
+                listOfNotNull(getExternalFilesDir("models"), File(filesDir, "models")).forEach { d ->
+                    d.listFiles()?.forEach { f ->
+                        if (f.name != MODEL_FILENAME && (f.name.startsWith("buddy-4b-") || f.name.endsWith(".part_dl") && !f.name.startsWith(MODEL_FILENAME))) {
+                            f.delete()
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+            }
+        }
         val mf = modelFile()
         if (mf.exists() && mf.length() > MIN_VALID_MODEL_BYTES && !modelReady && !modelLoading) {
             loadModelAsync(mf)
@@ -168,15 +205,19 @@ class MainActivity : ComponentActivity() {
             }
             pushModelStatusToJs()
             if (ok) {
-                val defaultLevers = JSONObject()
-                    .put("warmth", "high")
-                    .put("sharpness", "med")
-                    .put("irony", "low")
-                    .put("dark", "off")
-                    .put("pushback", "med")
-                    .put("energy", "med")
-                    .put("brevity", "normal")
-                val baseSys = buildSocialSystemPrompt("buddy_default_v1", defaultLevers, "", "Mike", "Senators, Penguins, Knicks, Eagles")
+                val baseSys = if (isLightFlavor) {
+                    buildAssistantSystemPrompt("Mike", "", "")
+                } else {
+                    val defaultLevers = JSONObject()
+                        .put("warmth", "high")
+                        .put("sharpness", "med")
+                        .put("irony", "low")
+                        .put("dark", "off")
+                        .put("pushback", "med")
+                        .put("energy", "med")
+                        .put("brevity", "normal")
+                    buildSocialSystemPrompt("buddy_default_v1", defaultLevers, "", "Mike", "Senators, Penguins, Knicks, Eagles")
+                }
                 LlamaBridge.nativeWarmupPrefix("<|startoftext|><|im_start|>system\n$baseSys")
             }
         }
@@ -295,6 +336,52 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun buildAssistantSystemPrompt(
+        userName: String,
+        userContext: String,
+        recentCtx: String,
+        tone: String = "concise"
+    ): String {
+        val safeName = userName.trim().ifEmpty { "Mike" }
+        val safeContext = userContext.trim().ifEmpty { "Schedule: 2:30 PM project review (45m), 25m transit, 4:00 PM team call. Bilingual EN/RU." }
+        val isCrisis = CRISIS_RE.containsMatchIn(recentCtx)
+        val hasPhysical = PHYSICAL_CUE_RE.containsMatchIn(recentCtx)
+
+        val lines = mutableListOf(
+            "You are Phone Buddy Light, a sharp, smart, reliable personal AI assistant running directly on the user's phone.",
+            "You are speaking directly to $safeName ('you'). Never refer to the user in the third person.",
+            "Core voice & assistant directives:",
+            "- Tone & Style: Be direct, helpful, and concise. Deliver high-value, actionable answers without corporate filler, disclaimers, or robotic throat-clearing ('Sure, I can help you with that!').",
+            "- Formatting: Use clean markdown, bullet points, numbered lists, or bold highlights where it makes information easy to scan and act upon.",
+            "- Grounded On-Device Identity: You run 100% locally on the user's device. You have no physical body, mouth, or hands — you cannot drink coffee, eat lunch, or meet in person. If asked about physical meetups or drinks, clarify dryly that you are an AI in their phone screen.",
+            "- Time & Math Accuracy (CRITICAL): Always calculate intermediate time steps out loud step-by-step before concluding. For example: '2:30 PM plus 45 minutes puts you at 3:15 PM, plus 25 minutes of travel gets you there at 3:40 PM. Since 3:40 PM is 20 minutes before 4:00 PM, you will make your 4:00 PM call with time to spare.'",
+            "- Drafting: When drafting messages, emails, or notes, provide ready-to-use text in the requested tone (professional, direct, or casual).",
+            "- Language: You are fully bilingual. If the user addresses you in Russian, reply naturally in clean, fluent Russian. If in English, reply in English.",
+            "- Memory & Honesty: Your known facts outside this chat are strictly limited to SAVED_USER_NOTES below. Never invent past unrecorded events or outside people."
+        )
+
+        if (tone == "concise") {
+            lines.add("- Length: Keep answers concise and punchy (1-3 short paragraphs or clean bullets).")
+        } else {
+            lines.add("- Length: Provide a thorough breakdown with details and rationale.")
+        }
+
+        if (isCrisis) {
+            lines.add("- SAFETY OVERRIDE: The user sounds in real distress. Stay calm, warm, grounded, and genuinely supportive.")
+        }
+
+        lines.add("SAVED_USER_NOTES:\nUser: $safeName\nContext: $safeContext")
+
+        if (hasPhysical) {
+            lines.add(
+                "NOTE FOR THIS TURN: Meeting in person, drinking, or eating came up. " +
+                "You live inside the user's phone screen with no physical body or mouth. Do not agree to meet up or consume anything; mention your digital phone screen."
+            )
+        }
+
+        return lines.joinToString("\n")
+    }
+
     private fun buildSocialSystemPrompt(
         personaId: String,
         levers: JSONObject,
@@ -365,15 +452,19 @@ class MainActivity : ComponentActivity() {
         return lines.joinToString("\n")
     }
 
-    private fun buildChatMlPrompt(sysPrompt: String, historyArr: JSONArray): String {
+    private fun buildChatMlPrompt(sysPrompt: String, historyArr: JSONArray, hasPhysicalCue: Boolean = false): String {
         val sb = StringBuilder()
         sb.append("<|startoftext|><|im_start|>system\n").append(sysPrompt).append("<|im_end|>\n")
         val startIdx = (historyArr.length() - 18).coerceAtLeast(0)
+        val lastIdx = historyArr.length() - 1
         for (i in startIdx until historyArr.length()) {
             val item = historyArr.getJSONObject(i)
             val role = item.optString("role", "user")
-            val content = item.optString("content", "").trim()
+            var content = item.optString("content", "").trim()
             if (content.isEmpty()) continue
+            if (i == lastIdx && role == "user" && hasPhysicalCue) {
+                content += "\n(Note: you are an AI living inside my phone with no physical body, hands, or mouth — do NOT agree to meet up or drink/eat anything; joke dryly about your phone screen or charging port in 1-2 short sentences.)"
+            }
             sb.append("<|im_start|>").append(role).append("\n").append(content).append("<|im_end|>\n")
         }
         sb.append("<|im_start|>assistant\n")
@@ -420,7 +511,9 @@ class MainActivity : ComponentActivity() {
             speechRecognizer?.destroy()
             speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
                 setRecognitionListener(object : RecognitionListener {
-                    override fun onReadyForSpeech(params: Bundle?) {}
+                    override fun onReadyForSpeech(params: Bundle?) {
+                        evalJs("window.__onNativeMicStarted && window.__onNativeMicStarted();")
+                    }
                     override fun onBeginningOfSpeech() {}
                     override fun onRmsChanged(rmsdB: Float) {}
                     override fun onBufferReceived(buffer: ByteArray?) {}
@@ -440,6 +533,7 @@ class MainActivity : ComponentActivity() {
                         val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         val txt = matches?.firstOrNull()?.trim() ?: ""
                         evalJs("window.__onNativeMicText && window.__onNativeMicText(${JSONObject.quote(txt)}, true);")
+                        evalJs("window.__onNativeMicStopped && window.__onNativeMicStopped();")
                     }
 
                     override fun onError(error: Int) {
@@ -451,10 +545,11 @@ class MainActivity : ComponentActivity() {
 
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             }
             speechRecognizer?.startListening(intent)
+            evalJs("window.__onNativeMicStarted && window.__onNativeMicStarted();")
         }
     }
 
@@ -487,7 +582,12 @@ class MainActivity : ComponentActivity() {
             workerPool.execute {
                 try {
                     val levers = JSONObject(leversJson)
-                    val baseSys = buildSocialSystemPrompt(personaId, levers, "", userName, userTeams)
+                    val baseSys = if (isLightFlavor || personaId == "assistant") {
+                        val tone = levers.optString("tone", "concise")
+                        buildAssistantSystemPrompt(userName, userTeams, "", tone)
+                    } else {
+                        buildSocialSystemPrompt(personaId, levers, "", userName, userTeams)
+                    }
                     LlamaBridge.nativeWarmupPrefix("<|startoftext|><|im_start|>system\n$baseSys")
                 } catch (_: Exception) {
                 }
@@ -512,12 +612,20 @@ class MainActivity : ComponentActivity() {
                     for (i in tailStart until hist.length()) {
                         recentSb.append(hist.getJSONObject(i).optString("content", "")).append(" ")
                     }
-                    val sysPrompt = buildSocialSystemPrompt(personaId, levers, recentSb.toString(), userName, userTeams)
-                    val fullPrompt = buildChatMlPrompt(sysPrompt, hist)
+                    val recentStr = recentSb.toString()
+                    val isAssistant = isLightFlavor || personaId == "assistant"
+                    val sysPrompt = if (isAssistant) {
+                        val tone = levers.optString("tone", "concise")
+                        buildAssistantSystemPrompt(userName, userTeams, recentStr, tone)
+                    } else {
+                        buildSocialSystemPrompt(personaId, levers, recentStr, userName, userTeams)
+                    }
+                    val fullPrompt = buildChatMlPrompt(sysPrompt, hist, !isAssistant && PHYSICAL_CUE_RE.containsMatchIn(recentStr))
 
-                    LlamaBridge.nativeGenerateStream(fullPrompt, 200, object : LlamaBridge.TokenCallback {
+                    val maxTokens = if (isAssistant) 400 else 200
+                    LlamaBridge.nativeGenerateStream(fullPrompt, maxTokens, object : LlamaBridge.TokenCallback {
                         override fun onToken(piece: String) {
-                            val cleaned = piece.replace(" — ", ", ").replace("—", ", ")
+                            val cleaned = if (isAssistant) piece else piece.replace(" — ", ", ").replace("—", ", ")
                             evalJs("window.__onNativeToken && window.__onNativeToken(${JSONObject.quote(turnId)}, ${JSONObject.quote(cleaned)});")
                         }
                     })
@@ -569,6 +677,11 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface
         fun speakText(text: String, pitch: Float, rate: Float) {
             if (!ttsReady) return
+            if (RUSSIAN_RE.containsMatchIn(text)) {
+                tts?.language = Locale("ru", "RU")
+            } else {
+                tts?.language = Locale.US
+            }
             tts?.setPitch(pitch)
             tts?.setSpeechRate(rate)
             tts?.speak(text, TextToSpeech.QUEUE_ADD, null, "buddy_${System.nanoTime()}")

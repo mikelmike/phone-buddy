@@ -27,9 +27,15 @@
         <a
           class="apk-btn hidden"
           id="downloadApkLink"
-          href="https://github.com/mikelmike/phone-buddy/releases/latest/download/phone-buddy.apk"
-          title="Download 100% Offline Android APK (Fast 1.2B Brain)"
-        >APK</a>
+          href="https://github.com/mikelmike/phone-buddy/releases/download/v0.8.0-light/phone-buddy-light.apk"
+          title="Download Phone Buddy Light APK (Fast 1.2B On-Device Brain)"
+        >Light APK</a>
+        <a
+          class="apk-btn hidden"
+          id="openLightWebLink"
+          href="./light/"
+          title="Open Phone Buddy Light UI"
+        >Light UI</a>
         <button class="save-btn" id="saveConvoBtn" title="Save entire conversation">Save</button>
         <button class="ghost-icon-btn" id="openSettingsBtn" title="Settings" aria-label="Settings">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -85,14 +91,25 @@
       <div class="setting-group" id="apkInstallGroup" style="display:none">
         <div class="setting-row" style="padding-top:0">
           <div>
-            <div class="setting-label">100% Offline Android APK</div>
-            <div class="setting-sub">Runs fast 1.2B brain natively via llama.cpp</div>
+            <div class="setting-label">Phone Buddy Light APK</div>
+            <div class="setting-sub">ChatGPT-style assistant (7.3 MB)</div>
           </div>
           <a
             class="toggle-btn on"
             style="text-decoration:none"
-            href="https://github.com/mikelmike/phone-buddy/releases/latest/download/phone-buddy.apk"
-          >Download APK</a>
+            href="https://github.com/mikelmike/phone-buddy/releases/download/v0.8.0-light/phone-buddy-light.apk"
+          >Download Light</a>
+        </div>
+        <div class="setting-row" style="padding-top:8px">
+          <div>
+            <div class="setting-label">Phone Buddy Full APK</div>
+            <div class="setting-sub">3-character companion (7.3 MB)</div>
+          </div>
+          <a
+            class="toggle-btn on"
+            style="text-decoration:none"
+            href="https://github.com/mikelmike/phone-buddy/releases/download/v0.8.0-light/phone-buddy-full.apk"
+          >Download Full</a>
         </div>
       </div>
 
